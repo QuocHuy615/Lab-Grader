@@ -1,0 +1,30 @@
+{
+  "name": "lab-grader",
+  "version": "1.0.0",
+  "description": "LeeTKOB backend for C++ lab grading and constraint review",
+  "type": "module",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/QuocHuy615/Lab-Grader.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/QuocHuy615/Lab-Grader/issues"
+  },
+  "homepage": "https://github.com/QuocHuy615/Lab-Grader#readme",
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
