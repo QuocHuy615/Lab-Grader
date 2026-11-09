@@ -69,5 +69,3 @@ After the first CI run, configure a GitHub branch rule for `main` requiring pull
 requests and all four checks before merging. Adding the workflow alone does not
 enable branch protection. Evidence of failed and repaired checks must come from
 actual CI runs.
-
-PA2 makes no model API calls. It needs no model key and has zero model spend per lab. Configure a provider spending cap before enabling a paid model in a later checkpoint.

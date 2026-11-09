@@ -1,60 +1,117 @@
-# GET /labs/{labId}/review-queue
+# Review queue API contract — version 1
 
-Contract version: 1.0.0. Status: implemented checkpoint baseline.
+## 1. Conventions
 
-This contract records project decisions, not verified course or product-owner
-requirements. The IA3 `CONTRACT.md` template and full class brief are not present
-in this repository; reconcile this document with them before submission.
+- The endpoint path is `/labs/{labId}/review-queue`. Paths are case-sensitive and have no trailing slash.
+- Success responses are JSON encoded as UTF-8. Application errors use Problem Details. Responses carry `Cache-Control: no-store`.
+- Use `Authorization: Bearer <opaque-token>`. The scheme is case-insensitive. The server resolves the role and class assignments from the token. Clients cannot supply these permissions through request parameters.
+- Lab IDs match `^lab-[a-z0-9][a-z0-9-]{0,59}$` after one percent-decoding pass. Submission and review IDs are opaque strings. Timestamps are UTC ISO 8601 strings with milliseconds.
+- Clients should ignore additional response fields. Unknown and repeated query parameters are rejected.
 
-## Purpose and caller
+## 2. Errors
 
-Return unfinished submission reviews for one lab, oldest submissions first.
-Only an authenticated TA assigned to the lab's class can read the queue.
-Students and admins are denied in this baseline. A valid TA accessing an existing
-lab outside their classes receives 403; a nonexistent lab receives 404. This
-deliberately reveals existence to authenticated TAs and needs product-owner review.
+Application errors follow [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html).
+Clients use `type` to select behavior.
 
-## Authentication and implementation boundary
+```http
+HTTP/1.1 403 Forbidden
+Content-Type: application/problem+json; charset=utf-8
+Cache-Control: no-store
 
-The request uses `Authorization: Bearer <opaque-token>` (scheme case-insensitive).
-Missing, malformed, expired, or unrecognized credentials return 401. The injected
-server-side authenticator resolves credentials into a role and assigned class IDs;
-request parameters cannot grant permissions. Expiration must be enforced by the
-authenticator when a real identity provider is integrated.
+{
+  "type": "urn:leetkob:problem:forbidden",
+  "title": "Access denied",
+  "status": 403,
+  "detail": "Only an assigned TA may access this queue.",
+  "instance": "/labs/lab-other/review-queue"
+}
+```
 
-This checkpoint uses an in-memory repository and injectable authenticator. The
-default entry point denies all credentials. Real login, token issuance/expiration,
-database persistence and deployment authentication are not implemented.
+| Member     | Rule                                                                                        |
+| ---------- | ------------------------------------------------------------------------------------------- |
+| `type`     | Absolute URI from the table below                                                           |
+| `title`    | Stable title for that type                                                                  |
+| `status`   | Integer equal to the HTTP response status                                                   |
+| `detail`   | Nonempty explanation of the failure. Internal exception details and credentials are omitted |
+| `instance` | Requested path without its query string. Internal errors use `/`                            |
 
-For local demonstration only, `LAB_GRADER_DEMO=1` enables synthetic `lab-01` and the
-public credential `demo-ta`, assigned to `class-01`. This is a demo credential,
-not a production secret. The entry point binds to `127.0.0.1`.
+| HTTP status | Type                                     | Title                   | When                                                                                                                   |
+| ----------- | ---------------------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 400         | `urn:leetkob:problem:invalid-request`    | Invalid request         | The lab ID cannot be decoded, breaks the ID rule, or a query parameter violates the rules below                        |
+| 401         | `urn:leetkob:problem:unauthenticated`    | Authentication required | Credentials are missing, malformed, unrecognized or rejected by the authenticator. Includes `WWW-Authenticate: Bearer` |
+| 403         | `urn:leetkob:problem:forbidden`          | Access denied           | The caller has the wrong role or the lab belongs to an unassigned class                                                |
+| 404         | `urn:leetkob:problem:not-found`          | Resource not found      | The lab does not exist or the path does not match a route                                                              |
+| 405         | `urn:leetkob:problem:method-not-allowed` | Method not allowed      | The path matches the endpoint but the method is not GET. Includes `Allow: GET`                                         |
+| 500         | `urn:leetkob:problem:internal-error`     | Internal server error   | An unexpected failure. The detail is `An unexpected error occurred.`                                                   |
 
-## Request
+## 3. Resources
 
-| Input      | Rule                                                                              |
-| ---------- | --------------------------------------------------------------------------------- |
-| Method     | GET; other methods on this route return 405, with `Allow: GET`                    |
-| Path       | `/labs/{labId}/review-queue`; no trailing slash                                   |
-| `labId`    | Percent-decode once, then match `^lab-[a-z0-9][a-z0-9-]{0,59}$` (5–64 characters) |
-| `page`     | Optional positive decimal safe integer, default 1                                 |
-| `pageSize` | Optional positive decimal integer, 1–100, default 20                              |
-| Body       | Unused; callers should send no body                                               |
+### ReviewQueue
 
-Pagination values must match `^[1-9][0-9]*$`: no signs, whitespace, leading zeroes,
-fractions or exponents. `page * pageSize` must be a JavaScript safe integer
-(at most 9007199254740991). Unknown or repeated query parameters return 400.
-Percent-decoded slashes, malformed percent escapes and invalid lab IDs return 400
-when they match the route shape. An unmatched path returns 404.
+All fields below are required. Only `nextPage` is nullable.
 
-Processing order: route, method, authentication, role, input validation, lab
-existence, class ownership, response. Thus unauthenticated requests to this route
-receive 401 before input validation; unmatched paths receive 404 before auth.
+| Field                 | Type and rule                                                       |
+| --------------------- | ------------------------------------------------------------------- |
+| `labId`               | String containing the requested, decoded lab ID                     |
+| `items`               | Array of zero to `pageSize` ReviewItem objects                      |
+| `pagination`          | Object with the four fields below                                   |
+| `pagination.page`     | Positive integer containing the requested or default page           |
+| `pagination.pageSize` | Integer from 1 to 100 containing the requested or default page size |
+| `pagination.total`    | Nonnegative integer counting all unfinished reviews for this lab    |
+| `pagination.nextPage` | Integer equal to `page + 1` when more items exist, otherwise `null` |
 
-## Successful response
+### ReviewItem
 
-Status: **200**. `Content-Type: application/json; charset=utf-8`.
-All responses include `Cache-Control: no-store`.
+| Field          | Type and rule                                                                     |
+| -------------- | --------------------------------------------------------------------------------- |
+| `reviewId`     | Nonempty string identifying a unique review                                       |
+| `submissionId` | Nonempty string identifying the submission                                        |
+| `status`       | String enum with values `pending` and `in_review`. Completed reviews are excluded |
+| `submittedAt`  | UTC ISO 8601 timestamp in `YYYY-MM-DDTHH:mm:ss.sssZ` format                       |
+
+All ReviewItem fields are required. Student identities, class assignments, source code and raw model output are excluded from the response.
+
+## 4. Endpoints
+
+### GET /labs/{labId}/review-queue
+
+Returns the unfinished reviews of one lab, oldest submissions first. Only an authenticated TA assigned to the lab's class may call it. Students and admins receive 403. A TA outside the class receives 403 for an existing lab and 404 for a missing lab. This distinction reveals lab existence to authenticated TAs.
+
+| Input                      | Rule                                                                | Default |
+| -------------------------- | ------------------------------------------------------------------- | ------- |
+| `Authorization` header     | Required Bearer token                                               | None    |
+| `labId` path parameter     | Required, 5–64 characters after decoding, as defined in Conventions | None    |
+| `page` query parameter     | Optional positive decimal safe integer                              | 1       |
+| `pageSize` query parameter | Optional decimal integer from 1 to 100                              | 20      |
+| Request body               | Omit                                                                | None    |
+
+Pagination values must match `^[1-9][0-9]*$`. Signs, whitespace, leading zeroes, fractions and exponents are invalid. The product `page * pageSize` must be at most `9007199254740991`.
+
+The server checks in order and stops at the first failure.
+
+1. Match path and method. An unmatched path gives 404. An unsupported method on the route gives 405.
+2. Authenticate the caller, then verify the TA role. Failures give 401 and 403 respectively.
+3. Decode and validate the lab ID and query. Invalid input gives 400.
+4. Find the lab and check the TA's class assignment. Failures give 404 and 403 respectively.
+5. Return **200** with a ReviewQueue and `Content-Type: application/json; charset=utf-8`.
+
+### Pagination and repeated requests
+
+Sort by `submittedAt` ascending, then by `reviewId` ascending using case-sensitive string comparison. Take up to `pageSize` items starting at offset `(page - 1) * pageSize`.
+
+An empty queue returns 200 with `items: []`, `total: 0` and `nextPage: null`. A page beyond the last item also returns 200 with an empty array and the actual total. Each request reads current data. Concurrent inserts, deletions or completion can shift offsets, so a client may need to refresh from page 1.
+
+GET leaves review and grade state untouched. Repeating it against unchanged data returns the same JSON values. The request requires no idempotency key.
+
+### Example client flow
+
+This example uses the synthetic HTTP test fixture with three unfinished reviews. Request the first page with two items.
+
+```http
+GET /labs/lab-01/review-queue?pageSize=2 HTTP/1.1
+Host: 127.0.0.1:3000
+Authorization: Bearer test-ta
+```
 
 ```json
 {
@@ -65,114 +122,47 @@ All responses include `Cache-Control: no-store`.
       "submissionId": "submission-001",
       "status": "pending",
       "submittedAt": "2026-11-05T01:00:00.000Z"
+    },
+    {
+      "reviewId": "review-002",
+      "submissionId": "submission-002",
+      "status": "pending",
+      "submittedAt": "2026-11-05T01:00:00.000Z"
     }
   ],
-  "pagination": {
-    "page": 1,
-    "pageSize": 20,
-    "total": 1,
-    "nextPage": null
-  }
+  "pagination": { "page": 1, "pageSize": 2, "total": 3, "nextPage": 2 }
 }
 ```
 
-All displayed fields are required. Only `nextPage` is nullable.
+Send the returned page number with the same page size and token.
 
-| Field                 | Type and meaning                                                      |
-| --------------------- | --------------------------------------------------------------------- |
-| `labId`               | String, decoded requested lab ID                                      |
-| `items`               | Array of zero to `pageSize` public review objects                     |
-| `reviewId`            | Nonempty string, unique review identifier                             |
-| `submissionId`        | Nonempty string, submission identifier                                |
-| `status`              | String enum: `pending` or `in_review`; completed reviews are excluded |
-| `submittedAt`         | UTC ISO 8601 timestamp, `YYYY-MM-DDTHH:mm:ss.sssZ`                    |
-| `pagination.page`     | Integer, requested/default page                                       |
-| `pagination.pageSize` | Integer, requested/default page size                                  |
-| `pagination.total`    | Nonnegative integer, unfinished review count for this lab             |
-| `pagination.nextPage` | Current page + 1 if more items exist, otherwise null                  |
-
-The repository must supply unique nonempty identifiers and normalized timestamps.
-Responses project only these fields; student identities, class membership, source
-code, raw model output and private repository fields are excluded.
-
-## Pagination and repeated requests
-
-Offset pagination uses `(page - 1) * pageSize`. Sort by `submittedAt` ascending,
-then `reviewId` ascending using case-sensitive string comparison. The repository
-order does not affect the result. An existing empty lab returns `items: []`,
-`total: 0`, `nextPage: null`. Pages beyond the end return 200 with an empty array
-and the actual total. The final nonempty page also has `nextPage: null`.
-
-Each request reads current repository state. There is no snapshot guarantee
-between requests: concurrent inserts, completion or deletion can shift offsets,
-causing duplicates or omissions. Refresh from page 1 after changes.
-
-GET does not mutate review state, publish marks or mark items as reviewed.
-Repeated requests against unchanged data return equal JSON values. Creation
-idempotency keys are not applicable.
-
-## Error responses
-
-Errors follow [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html) and use
-`Content-Type: application/problem+json; charset=utf-8`. Required fields:
-`type` (absolute problem URI), `title` (stable string), `status` (HTTP status
-integer), `detail` (nonempty explanation), `instance` (request path without query).
-For unexpected failures, `instance` is `/`. Internal exception details and
-credentials are never returned. Clients should branch on `type`, not `detail`.
-
-Example: a TA accessing another class's existing lab receives:
+```http
+GET /labs/lab-01/review-queue?page=2&pageSize=2 HTTP/1.1
+Host: 127.0.0.1:3000
+Authorization: Bearer test-ta
+```
 
 ```json
 {
-  "type": "urn:leetkob:problem:forbidden",
-  "title": "Access denied",
-  "status": 403,
-  "detail": "Only an assigned TA may access this queue.",
-  "instance": "/labs/lab-other/review-queue"
+  "labId": "lab-01",
+  "items": [
+    {
+      "reviewId": "review-003",
+      "submissionId": "submission-003",
+      "status": "in_review",
+      "submittedAt": "2026-11-05T02:00:00.000Z"
+    }
+  ],
+  "pagination": { "page": 2, "pageSize": 2, "total": 3, "nextPage": null }
 }
 ```
 
-The following types use the prefix `urn:leetkob:problem:`. Each row defines an
-error response with the five fields above, its listed status/title, an explanation
-of that condition, and the requested path as instance (except 500).
+Stop when `nextPage` is `null`. The manual demo uses `LAB_GRADER_DEMO=1` and the public demo token `demo-ta`. That fixture contains one item, so it returns `nextPage: null` on the first page. The default entry point rejects credentials until an authenticator is configured. The checkpoint has in-memory storage and an injected authenticator. Token issuance and expiry enforcement belong to the future identity provider.
 
-| Status | Type suffix          | Title                   | Trigger / detail                                                                 |
-| ------ | -------------------- | ----------------------- | -------------------------------------------------------------------------------- |
-| 400    | `invalid-request`    | Invalid request         | Invalid lab ID, query parameter or pagination; detail explains the violated rule |
-| 401    | `unauthenticated`    | Authentication required | `A valid bearer token is required.`; includes `WWW-Authenticate: Bearer`         |
-| 403    | `forbidden`          | Access denied           | `Only an assigned TA may access this queue.`; wrong role or class assignment     |
-| 404    | `not-found`          | Resource not found      | `Lab not found.` for a missing lab, `Route not found.` for an unmatched path     |
-| 405    | `method-not-allowed` | Method not allowed      | `Use GET for this endpoint.`; includes `Allow: GET`                              |
-| 500    | `internal-error`     | Internal server error   | `An unexpected error occurred.`; instance `/`                                    |
+Run the [HTTP contract tests](../../tests/review-queue.contract.test.mjs) with `npm run test`. They verify field shape, role and class isolation, every documented problem type, pagination and read-only behavior. [PA2 CI evidence](../../PA2.md) records the intentional pagination regression and the repair.
 
-## Compatibility
+## 5. Versions and the legacy API
 
-Renaming/removing fields, changing types, authentication, permission semantics,
-pagination defaults/order or existing status meanings is a breaking change.
-Update this contract and tests together through a reviewed PR and document client
-migration before release; introduce a separately versioned endpoint if existing
-consumers need the old behavior. Clients should tolerate future additive fields.
+Version 1 serves the unprefixed path defined above. Additive changes such as optional fields may stay within this contract. Removing or renaming a field, changing a field type, tightening validation, changing permissions, changing pagination defaults or ordering, or changing an existing error meaning requires a new version and a documented migration. Existing clients can continue using the current path during migration.
 
-## Executable contract tests
-
-`tests/review-queue.contract.test.mjs` sends real HTTP requests to an ephemeral
-local server, using independently specified expected responses and synthetic data.
-`npm test` runs these tests and entry-point smoke tests locally and in the existing
-required `test` CI job; any assertion failure exits nonzero.
-
-Coverage includes exact public response shape, defaults, ordering and tie-breaks,
-completed/other-lab exclusion, empty and out-of-range pages, pagination boundaries,
-read-only behavior, all documented error types/headers, wrong roles and cross-class
-ownership denial, validation precedence, and recovery after an internal failure.
-
-## Deliberate CI break procedure
-
-1. Commit the correct implementation and tests on a feature branch; push and open a PR.
-2. On that PR branch, temporarily remove the class-ownership guard in `src/review-queue.ts`.
-3. Push the deliberate defect. The cross-class contract tests must fail in CI.
-4. Record the failed Actions run URL and a PR view showing required checks blocking merge.
-5. Restore the guard in a new commit, push, and record the green run and repair commit.
-6. Add real evidence links to root `PA2.md`. Do not merge the broken version.
-
-A local failure is useful verification but is not evidence that GitHub blocked a
-merge. No CI experiment or evidence link is claimed by this document.
+Update the contract and its tests in the same reviewed change when introducing a version. This checkpoint has no legacy review queue API and therefore no legacy deprecation or sunset schedule.
