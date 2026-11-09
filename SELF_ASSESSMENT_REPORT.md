@@ -1,0 +1,18 @@
+# PA2 self-assessment
+
+| Criterion               | Maximum | Claimed | Evidence                                                                                                                                                                                                                                                                    |
+| ----------------------- | ------: | ------: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rules file              |      15 |      12 | [AGENTS.md](AGENTS.md) has four sections. The peer-range and PR-base rules trace to actual failures in [AI-LOG.md](AI-LOG.md).                                                                                                                                              |
+| Permissions and secrets |      10 |       8 | [PERMISSIONS.md](PERMISSIONS.md) lists three tiers. [.env.example](.env.example) lists variables and [.gitignore](.gitignore) excludes local values. A scan of reachable commits found only `.env.example` among env files and no matches for common credential signatures. |
+| One command per check   |      10 |      10 | The [README](README.md) and [CI workflow](.github/workflows/ci.yml) use the same four commands. The [successful run](https://github.com/QuocHuy615/Lab-Grader/actions/runs/42551306978) installed dependencies with `npm ci`.                                               |
+| CI merge gate           |      20 |      18 | [PA2.md](PA2.md) links the `main` ruleset, the PR with a failing required test and the passing repair. The GitHub API returned `unstable` while the test failed.                                                                                                            |
+| Endpoint contract       |      25 |      22 | The [review queue contract](docs/contract/review-queue.md) covers role, class ownership, field rules, RFC 9457 errors, pagination and compatibility.                                                                                                                        |
+| Contract tests          |      15 |      14 | The [HTTP contract tests](tests/review-queue.contract.test.mjs) cover ownership, pagination and each documented error type. The [deliberate break](https://github.com/QuocHuy615/Lab-Grader/actions/runs/42551198590/job/128946958561) failed two cases in required CI.     |
+| AI log                  |       5 |       5 | [AI-LOG.md](AI-LOG.md) names tools, changes and rejected approaches with commit and PR evidence.                                                                                                                                                                            |
+| **Total**               | **100** |  **89** |                                                                                                                                                                                                                                                                             |
+
+## What we did not manage
+
+- The IA3 `CONTRACT.md` template was unavailable for a section-by-section comparison.
+- Merge-gate evidence consists of the active ruleset, failing check and recorded API state. We did not capture a disabled merge button or attempt a merge while checks were red.
+- PA2 uses synthetic fixtures. A production model integration, provider spending cap and persistent storage are outside this checkpoint implementation.

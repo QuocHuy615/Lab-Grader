@@ -13,7 +13,7 @@ For a fresh checkout, create local configuration:
 Copy-Item .env.example .env
 ```
 
-Set `LAB_GRADER_DEMO=1` in `.env` to enable the synthetic demo data.
+Add an uncommented `LAB_GRADER_DEMO=1` line in `.env` to enable the synthetic demo data.
 The application automatically reads `.env` from the working directory for both
 `npm run dev` and `npm start`. Existing shell environment variables take priority.
 The file is optional; without it, defaults and shell variables apply.
@@ -52,7 +52,7 @@ Run the same four commands locally as in GitHub Actions:
 npm run lint
 npm run format:check
 npm run typecheck
-npm test
+npm run test
 ```
 
 Use `npm run format` to apply formatting. Lint warnings fail the check.
@@ -62,10 +62,12 @@ and smoke tests run in the existing required `test` CI job.
 
 ## CI and branch protection
 
-CI runs on every pull request and on pushes to `main`, with separate checks named
+CI runs on every pull request and on pushes to `main` or the `pa2` tag, with checks named
 `lint`, `format:check`, `typecheck`, and `test`.
 
 After the first CI run, configure a GitHub branch rule for `main` requiring pull
 requests and all four checks before merging. Adding the workflow alone does not
 enable branch protection. Evidence of failed and repaired checks must come from
 actual CI runs.
+
+PA2 makes no model API calls. It needs no model key and has zero model spend per lab. Configure a provider spending cap before enabling a paid model in a later checkpoint.
