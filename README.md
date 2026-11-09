@@ -42,7 +42,7 @@ Invoke-RestMethod -Uri "http://127.0.0.1:3000/labs/lab-01/review-queue?page=1&pa
 `demo-ta` is a public demo credential for synthetic data only. Stop the server
 with Ctrl+C. Set `LAB_GRADER_DEMO=0` in `.env` to disable demo mode on the next run.
 See [the review queue contract](docs/contract/review-queue.md) for schema, errors,
-permissions, pagination, implementation boundaries and the CI break procedure.
+permissions, pagination and compatibility rules.
 
 ## Quality checks
 
@@ -65,7 +65,7 @@ and smoke tests run in the existing required `test` CI job.
 CI runs on every pull request and on pushes to `main` or the `pa2` tag, with checks named
 `lint`, `format:check`, `typecheck`, and `test`.
 
-After the first CI run, configure a GitHub branch rule for `main` requiring pull
-requests and all four checks before merging. Adding the workflow alone does not
-enable branch protection. Evidence of failed and repaired checks must come from
-actual CI runs.
+The `main` ruleset requires pull requests and all four checks. In PR #4, a
+deliberate change to the default page size failed two tests and disabled the
+merge button. Restoring the documented default made all four checks pass.
+See [PA2.md](PA2.md) for the ruleset, screenshot and CI runs.

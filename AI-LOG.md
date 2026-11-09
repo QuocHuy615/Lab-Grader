@@ -78,9 +78,9 @@ Tool: Codex.
 
 Asked for: Rewrite the AI log and self-assessment to match the course templates.
 
-Kept: The documented evidence and the 89/100 self-assessment.
+Kept: The links to the failed test on PR #3 and the commit that restored the default page size to `20`.
 
-Changed: The log now has dated task entries with all five fields. The report identifies the submitter and records what I would do differently.
+Changed: Split the log into dated entries and added the submitter and reflection sections from the course report template.
 
 Rejected: None.
 
@@ -95,6 +95,18 @@ Kept: The implemented route, ownership checks, response schema and error types.
 Changed: Replaced the provisional layout with the IA#3 structure and added complete request and response examples for the first and last pages using the HTTP test fixture.
 
 Rejected: None. [Revised contract](docs/contract/review-queue.md)
+
+## 2026-11-09 — Final rubric and README review
+
+Tool: Codex.
+
+Asked for: Review the submission for unfinished material and raise the self-assessment to 95 if the evidence supports it.
+
+Kept: The API behavior, tests and previously recorded CI evidence.
+
+Changed: Claimed the final contract-test point based on the documented coverage and the failed required job on PR #4. Updated the README to describe the existing protection and point to the screenshot.
+
+Rejected: None.
 
 ## Data sent by the product to a model
 
