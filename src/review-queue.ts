@@ -80,7 +80,7 @@ export function reviewQueue(
       return;
     }
     const page = positiveInteger(params.get("page"), 1);
-    const pageSize = positiveInteger(params.get("pageSize"), 20);
+    const pageSize = positiveInteger(params.get("pageSize"), 10);
     if (
       page === undefined ||
       pageSize === undefined ||
